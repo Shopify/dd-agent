@@ -27,7 +27,7 @@ class ZooKeeperTestCase(AgentCheckTest):
     CONNECTION_FAILURE_CONFIG = {
         'host': "127.0.0.1",
         'port': 2182,
-        'expected_mode': "follower",
+        'expected_mode': "standalone",
         'tags': []
     }
 

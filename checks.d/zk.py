@@ -113,6 +113,7 @@ class ZookeeperCheck(AgentCheck):
             status = AgentCheck.CRITICAL
             message = 'No response from `ruok` command'
             self.increment('zookeeper.timeouts')
+            raise
         else:
             ruok_out.seek(0)
             ruok = ruok_out.readline()
@@ -121,8 +122,9 @@ class ZookeeperCheck(AgentCheck):
             else:
                 status = AgentCheck.WARNING
             message = u'Response from the server: %s' % ruok
-        self.service_check('zookeeper.ruok', status, message=message,
-                           tags=sc_tags)
+        finally:
+            self.service_check('zookeeper.ruok', status, message=message,
+                    tags=sc_tags)
 
         # Read metrics from the `stat` output.
         try:
@@ -147,7 +149,7 @@ class ZookeeperCheck(AgentCheck):
             self.set_instance_status(hostname, state)
 
             if expected_mode:
-                if mode == expected_mode:
+                if state == expected_mode:
                     status = AgentCheck.OK
                     message = u"Server is in %s mode" % mode
                 else:
