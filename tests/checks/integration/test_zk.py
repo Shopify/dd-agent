@@ -31,7 +31,7 @@ class ZooKeeperTestCase(AgentCheckTest):
         'tags': []
     }
 
-    METRICS = [
+    STAT_METRICS = [
         'zookeeper.latency.min',
         'zookeeper.latency.avg',
         'zookeeper.latency.max',
@@ -44,6 +44,17 @@ class ZooKeeperTestCase(AgentCheckTest):
         'zookeeper.zxid.epoch',
         'zookeeper.zxid.count',
         'zookeeper.nodes',
+        'zookeeper.instances',
+    ]
+
+    STATUS_TYPES = [
+        'leader',
+        'follower',
+        'observer',
+        'standalone',
+        'down',
+        'inactive',
+        'unknown',
     ]
 
     def test_check(self):
@@ -56,12 +67,19 @@ class ZooKeeperTestCase(AgentCheckTest):
         self.run_check(config)
 
         # Test metrics
-        for mname in self.METRICS:
+        for mname in self.STAT_METRICS:
             self.assertMetric(mname, tags=["mode:standalone", "mytag"], count=1)
 
         # Test service checks
         self.assertServiceCheck("zookeeper.ruok", status=AgentCheck.OK)
         self.assertServiceCheck("zookeeper.mode", status=AgentCheck.OK)
+
+        for t in self.STATUS_TYPES:
+            expected_value = 0
+            if t == 'standalone':
+                expected_value = 1 
+            mname = "zookeeper.instances." + t
+            self.assertMetric(mname, value=expected_value, count=1)
 
         self.coverage_report()
 
@@ -79,7 +97,8 @@ class ZooKeeperTestCase(AgentCheckTest):
 
     def test_error_state(self):
         """
-        Raise a 'critical' service check when ZooKeeper is in an error state
+        Raise a 'critical' service check when ZooKeeper is in an error state.
+        Report status as down.
         """
         config = {
             'instances': [self.CONNECTION_FAILURE_CONFIG]
@@ -90,5 +109,14 @@ class ZooKeeperTestCase(AgentCheckTest):
             lambda: self.run_check(config)
         )
 
-        # Test service checks
         self.assertServiceCheck("zookeeper.ruok", status=AgentCheck.CRITICAL)
+
+        self.assertMetric("zookeeper.instances", tags=["mode:down"], count=1)
+
+        for t in self.STATUS_TYPES:
+            expected_value = 0
+            if t == 'down':
+                expected_value = 1 
+            mname = "zookeeper.instances." + t
+            self.assertMetric(mname, value=expected_value, count=1)
+

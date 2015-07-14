@@ -113,6 +113,7 @@ class ZookeeperCheck(AgentCheck):
             status = AgentCheck.CRITICAL
             message = 'No response from `ruok` command'
             self.increment('zookeeper.timeouts')
+            self.set_instance_status(hostname, 'down', tags)
             raise
         else:
             ruok_out.seek(0)
@@ -131,12 +132,12 @@ class ZookeeperCheck(AgentCheck):
             stat_out = self._send_command('stat', *cx_args)
         except ZKConnectionFailure:
             self.increment('zookeeper.timeouts')
-            self.set_instance_status(hostname, 'down')
+            self.set_instance_status(hostname, 'down', tags)
         except:
             e = sys.exc_info()[1]
             print >> sys.stderr, "Error: %s" % e
             self.increment('zookeeper.datadog_client_exception')
-            self.set_instance_status(hostname, 'unknown')
+            self.set_instance_status(hostname, 'unknown', tags)
         else:
             # Parse the response
             metrics, new_tags, state, zk_version = self.parse_stat(stat_out)
@@ -146,7 +147,7 @@ class ZookeeperCheck(AgentCheck):
             if state != 'inactive':
                 for metric, value in metrics:
                     self.gauge(metric, value, tags=tags + new_tags)
-            self.set_instance_status(hostname, state)
+            self.set_instance_status(hostname, state, tags)
 
             if expected_mode:
                 if state == expected_mode:
@@ -176,9 +177,9 @@ class ZookeeperCheck(AgentCheck):
                         self.gauge(name, metrics[name], tags=tags + [mode])
 
 
-    def set_instance_status(self, hostname, status):
+    def set_instance_status(self, hostname, status, tags):
         mode = 'mode:%s' % status
-        tags = [mode]
+        tags = tags + [mode]
         self.set('zookeeper.instances', hostname, tags=tags)
 
         gauges = {
