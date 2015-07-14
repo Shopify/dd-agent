@@ -106,6 +106,7 @@ class ZookeeperCheck(AgentCheck):
         zk_version = None # parse_stat will parse and set version string
 
         # Send a service check based on the `ruok` response.
+        # Set instance status to down if not ok.
         try:
             ruok_out = self._send_command('ruok', *cx_args)
         except ZKConnectionFailure:
@@ -113,7 +114,7 @@ class ZookeeperCheck(AgentCheck):
             status = AgentCheck.CRITICAL
             message = 'No response from `ruok` command'
             self.increment('zookeeper.timeouts')
-            self.set_instance_status(hostname, 'down', tags)
+            self.report_instance_mode(hostname, 'down', tags)
             raise
         else:
             ruok_out.seek(0)
@@ -132,25 +133,26 @@ class ZookeeperCheck(AgentCheck):
             stat_out = self._send_command('stat', *cx_args)
         except ZKConnectionFailure:
             self.increment('zookeeper.timeouts')
-            self.set_instance_status(hostname, 'down', tags)
+            self.report_instance_mode(hostname, 'down', tags)
+            raise
         except:
             e = sys.exc_info()[1]
             print >> sys.stderr, "Error: %s" % e
             self.increment('zookeeper.datadog_client_exception')
-            self.set_instance_status(hostname, 'unknown', tags)
+            self.report_instance_mode(hostname, 'unknown', tags)
+            raise
         else:
             # Parse the response
-            metrics, new_tags, state, zk_version = self.parse_stat(stat_out)
-            mode = "mode:%s" % state
+            metrics, new_tags, mode, zk_version = self.parse_stat(stat_out)
 
             # Write the data
-            if state != 'inactive':
+            if mode != 'inactive':
                 for metric, value in metrics:
                     self.gauge(metric, value, tags=tags + new_tags)
-            self.set_instance_status(hostname, state, tags)
+            self.report_instance_mode(hostname, mode, tags)
 
             if expected_mode:
-                if state == expected_mode:
+                if mode == expected_mode:
                     status = AgentCheck.OK
                     message = u"Server is in %s mode" % mode
                 else:
@@ -165,21 +167,24 @@ class ZookeeperCheck(AgentCheck):
                 mntr_out = self._send_command('mntr', *cx_args)
             except ZKConnectionFailure:
                 self.increment('zookeeper.timeouts')
+                self.report_instance_mode(hostname, 'down', tags)
+                raise
             except:
                 e = sys.exc_info()[1]
                 print >> sys.stderr, "Error: %s" % e
                 self.increment('zookeeper.datadog_client_exception')
+                self.report_instance_mode(hostname, 'unknown', tags)
+                raise
             else:
-                metrics, state = self.parse_mntr(mntr_out)
-                mode = "mode:%s" % state
-                if state != 'inactive':
+                metrics, mode = self.parse_mntr(mntr_out)
+                mode_tag = "mode:%s" % mode
+                if mode != 'inactive':
                     for name in metrics:
-                        self.gauge(name, metrics[name], tags=tags + [mode])
+                        self.gauge(name, metrics[name], tags=tags + [mode_tag])
 
 
-    def set_instance_status(self, hostname, status, tags):
-        mode = 'mode:%s' % status
-        tags = tags + [mode]
+    def report_instance_mode(self, hostname, mode, tags):
+        tags = tags + ['mode:%s' % mode]
         self.set('zookeeper.instances', hostname, tags=tags)
 
         gauges = {
@@ -192,8 +197,8 @@ class ZookeeperCheck(AgentCheck):
             'unknown': 0
         }
 
-        if status in gauges.keys():
-            gauges[status] = 1
+        if mode in gauges.keys():
+            gauges[mode] = 1
         else:
             gauges['unknown'] = 1
 
@@ -323,8 +328,8 @@ class ZookeeperCheck(AgentCheck):
 
     def parse_mntr(self, buf):
         ''' `buf` is a readable file-like object
-            returns a tuple: (metrics, state)
-            if state == 'inactive', metrics will be None
+            returns a tuple: (metrics, mode)
+            if mode == 'inactive', metrics will be None
         '''
 
         buf.seek(0)
@@ -342,10 +347,10 @@ class ZookeeperCheck(AgentCheck):
             else:
                 raise Exception("Data not in 'key value' format, could not parse '%s'" % data.join(' '))
 
-        # state is a string {'standalone', 'leader', 'follower', 'observer'}
-        state = metrics.pop('zookeeper.server.state').lower()
+        # mode is a string {'standalone', 'leader', 'follower', 'observer'}
+        mode = metrics.pop('zookeeper.server.state').lower()
 
         for key in metrics: # everything else is an int
             metrics[key] = int(metrics[key])
 
-        return (metrics, state)
+        return (metrics, mode)

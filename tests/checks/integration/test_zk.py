@@ -27,7 +27,7 @@ class ZooKeeperTestCase(AgentCheckTest):
     CONNECTION_FAILURE_CONFIG = {
         'host': "127.0.0.1",
         'port': 2182,
-        'expected_mode': "standalone",
+        'expected_mode': "down",
         'tags': []
     }
 
@@ -74,9 +74,10 @@ class ZooKeeperTestCase(AgentCheckTest):
         self.assertServiceCheck("zookeeper.ruok", status=AgentCheck.OK)
         self.assertServiceCheck("zookeeper.mode", status=AgentCheck.OK)
 
+        expected_mode = self.CONFIG['expected_mode']
         for t in self.STATUS_TYPES:
             expected_value = 0
-            if t == 'standalone':
+            if t == expected_mode:
                 expected_value = 1 
             mname = "zookeeper.instances." + t
             self.assertMetric(mname, value=expected_value, count=1)
@@ -113,9 +114,10 @@ class ZooKeeperTestCase(AgentCheckTest):
 
         self.assertMetric("zookeeper.instances", tags=["mode:down"], count=1)
 
+        expected_mode = self.CONNECTION_FAILURE_CONFIG['expected_mode']
         for t in self.STATUS_TYPES:
             expected_value = 0
-            if t == 'down':
+            if t == expected_mode:
                 expected_value = 1 
             mname = "zookeeper.instances." + t
             self.assertMetric(mname, value=expected_value, count=1)
