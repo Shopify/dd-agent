@@ -10,12 +10,15 @@ Example:
 If available, make use of the data reported by `mntr` not `stat`.
 The dublicate `stat` reports are only kept for backward compatability.
 
-Besides the usual zookeeper state of `leader`, `follower`, `observer` amd `standalone`,
+Besides the usual zookeeper state of `leader`, `follower`, `observer` and `standalone`,
 this check will report three other states:
 
     `down`: the check cannot connect to zookeeper
     `inactive`: the zookeeper instance has lost connection to the cluster
     `unknown`: an unexpected error has occured in this check
+
+States can be accessed through the gauge `zookeeper.instances.<state>,
+through the set `zookeeper.instances`, or through the `mode:<state>` tag.
 
 Parses the response from zookeeper's `stat` admin command, which looks like:
 
