@@ -1,14 +1,21 @@
 '''
-As of ZooKeeper 3.4.0, the `mntr` admin command is provided for easy parsing of ZooKeeper stats.
-This check first parses the `stat` command for a version number.
-If the version supports `mntr`, `mntr` is also parsed.
+As of zookeeper 3.4.0, the `mntr` admin command is provided for easy parsing of zookeeper stats.
+This check first parses the `stat` admin command for a version number.
+If the zookeeper version supports `mntr`, it is also parsed.
 
 Duplicate information is being reported by both `mntr` and `stat` to keep backwards compatability.
 Example:
     `stat` reports: zookeeper.latency.avg
     `mntr` reports: zookeeper.avg.latency
-You should make use of the stat reported by `mntr`.
-The `stat` name is only kept for backward compatability reasons.
+If available, make use of the data reported by `mntr` not `stat`.
+The dublicate `stat` reports are only kept for backward compatability.
+
+Besides the usual zookeeper state of `leader`, `follower`, `observer` amd `standalone`,
+this check will report three other states:
+
+    `down`: the check cannot connect to zookeeper
+    `inactive`: the zookeeper instance has lost connection to the cluster
+    `unknown`: an unexpected error has occured in this check
 
 Parses the response from zookeeper's `stat` admin command, which looks like:
 
@@ -35,7 +42,7 @@ Node count: 487
 
 The following is an example of the `mntr` commands output:
 
-````
+```
 zk_version  3.4.5-cdh4.4.0--1, built on 09/04/2013 01:46 GMT
 zk_avg_latency  0
 zk_max_latency  0
@@ -51,23 +58,7 @@ zk_ephemerals_count 0
 zk_approximate_data_size    27
 zk_open_file_descriptor_count   29
 zk_max_file_descriptor_count    4096
-````
-
-ZooKeeper `mntr` command may also output the following error:
-
-````
-This ZooKeeper instance is not currently serving requests
-````
-
-Stats parsed from `mntr` are reported with the given name
-where 'zk' is replaced with 'zookeeper' and '_' is replaced with '.'
-example: 'zk_avg_latency' becomes 'zookeeper.avg.latency'
-
-The state of ZooKeeper is reported with the tag 'mode:{inactive,leader,standalone,follower,observer,unknown,down}'
-'inactive' state is reported when `mntr` reports error.
-`down` state is reported when zookeeper is unreachable.
-`unknown` state is reported when any other exception occurs in this Check.
-State and hostname are also reported through the set 'zookeeper.instances'
+```
 
 `mntr` tested with ZooKeeper 3.4.5
 '''
